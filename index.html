@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Sponsorship Competition</title>
+    <!-- Use Tailwind CSS for a modern, responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b1c4a;
+        }
+        .input-text {
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .input-text:focus {
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+            outline: none;
+        }
+        .input-text:disabled {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            cursor: not-allowed;
+        }
+        .btn-submit {
+            background-image: linear-gradient(to right, #1d4ed8, #2563eb, #3b82f6);
+            transition: all 0.3s ease-in-out;
+        }
+        .btn-submit:hover:not(:disabled) {
+            background-image: linear-gradient(to left, #1d4ed8, #2563eb, #3b82f6);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .btn-submit:disabled {
+            background-color: #6b7280;
+            cursor: not-allowed;
+        }
+        .fade-in {
+            animation: fadeIn 1s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+    <!-- Firebase SDKs from CDN -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+</head>
+<body class="antialiased leading-normal tracking-wide">
+
+    <div class="container mx-auto max-w-4xl py-8 mt-8">
+        <div class="bg-white shadow-2xl rounded-3xl overflow-hidden transform transition duration-500 hover:scale-105">
+            <!-- Header with logo and title -->
+            <div class="p-8 bg-blue-700 text-white text-center rounded-t-3xl">
+                <!-- Logo with fallback in case the image fails to load -->
+                <img src="https://radars.football/wp-content/uploads/2022/10/WRFC-Badge-Website.png" alt="Woodham Radars Football Club Logo" class="h-28 w-auto mx-auto mb-4 drop-shadow-lg" onerror="this.onerror=null;this.src='https://placehold.co/112x112/0000FF/FFFFFF?text=WRFC+Logo';">
+                <h1 class="text-5xl font-black tracking-tighter">Woodham Radars FC</h1>
+                <p class="mt-2 text-blue-200 text-2xl font-semibold">Sponsorship Competition</p>
+                <p class="mt-4 text-blue-100 text-xl font-bold">U10 Girls Jaguars</p>
+            </div>
+            
+            <!-- Section for the entry fee -->
+            <div class="p-4 bg-yellow-400 text-yellow-900 text-center font-black text-2xl">
+                Entry Fee: £15 Per Team
+            </div>
+
+            <!-- New section explaining the sponsorship draw details -->
+            <div class="p-6 bg-gray-50 text-gray-700 text-center text-base md:text-lg border-b border-gray-200">
+                <p class="font-bold mb-2">
+                    Enter as many teams as you'd like for more chances to win
+                </p>
+                <p>Each entry goes into a special draw.</p>
+                <p>The winning company will have their logo displayed on our official matchday kit <br> for the 2025-2026 season!</p>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div class="p-4 bg-gray-100 text-center text-gray-600 text-sm flex justify-center items-center">
+                <span id="loading-indicator" class="flex items-center space-x-2">
+                    <svg class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Loading teams...</span>
+                </span>
+            </div>
+
+            <!-- The main form container -->
+            <div class="p-6 md:p-10">
+                <!-- A new, prominent error banner for configuration issues -->
+                <div id="authErrorBanner" class="hidden p-4 mt-4 text-center bg-red-100 border border-red-400 text-red-700 rounded-lg" role="alert"></div>
+
+                <!-- Sponsorship Count -->
+                <div class="text-center text-xl font-bold text-gray-800 mb-4">
+                    <span id="sponsored-teams-count">0/40 teams sponsored</span>
+                </div>
+                <div class="overflow-x-auto rounded-2xl shadow-inner">
+                    <table class="min-w-full text-left">
+                        <thead class="bg-blue-100 text-blue-800 uppercase text-xs font-bold tracking-wider">
+                            <tr>
+                                <th scope="col" class="px-4 py-4">Team Name</th>
+                                <th scope="col" class="px-4 py-4">Your Company Name</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teamsTableBody" class="divide-y divide-gray-200">
+                            <!-- Team rows will be dynamically inserted here by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- New section for the winner draw -->
+                <div class="mt-8 text-center">
+                    <!-- Button is now disabled by default -->
+                    <button id="drawButton" class="btn-submit text-white px-8 py-3 rounded-full text-lg font-bold shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-500/50" disabled>
+                        Draw the Winning Team
+                    </button>
+                    <div id="drawError" class="mt-2 text-red-600 font-medium"></div>
+                    <div id="countdownDisplay" class="mt-4 text-3xl font-black text-blue-700"></div>
+                    <div id="winnerDisplay" class="mt-4 text-4xl font-black text-green-600 animate-pulse"></div>
+                </div>
+
+            </div>
+            
+            <!-- Footer with more information -->
+            <div class="bg-blue-700 text-white text-center p-6 rounded-3xl">
+                <p class="text-lg font-medium">Have questions or need more information?</p>
+                <p class="mt-2 text-blue-100">Contact us at <a href="mailto:gchitticks@yahoo.co.uk" class="underline hover:text-white transition duration-200">gchitticks@yahoo.co.uk</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- USER CONFIGURATION: PASTE YOUR FIREBASE DETAILS HERE ---
+        // You can get this from your Firebase console -> Project Settings
+        const firebaseConfig = {
+          apiKey: "AIzaSyCfSTMff-usdAb3saQVzzXhs7HU4QP9L2Q",
+          authDomain: "u10jaguars.firebaseapp.com",
+          projectId: "u10jaguars",
+          storageBucket: "u10jaguars.firebasestorage.app",
+          messagingSenderId: "706806761738",
+          appId: "1:706806761738:web:3d236d14b69a1eec7592f3"
+        };
+        // --- END OF USER CONFIGURATION ---
+
+        // Initialize Firebase
+        let app, auth, db;
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            auth = app.auth();
+            db = app.firestore();
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+        }
+
+        // The complete list of 40 teams
+        const teams = [
+            "Woodham Radars Jaguars",
+            "Galleywood Eagles",
+            "Tottenham Hotspur",
+            "Aston Villa", "Bournemouth", "Brentford", "Brighton", "Burnley", 
+            "Chelsea", "Crystal Palace", "Everton", "Fulham", "Liverpool", "Luton Town", 
+            "Manchester City", "Manchester United", "Newcastle United", "Nottingham Forest", 
+            "Sheffield United", "West Ham United", "Wolverhampton Wanderers",
+            "AFC Sudbury", "Basildon United", "Bowers & Pitsea", "Brentwood Town", "Bury Town", "Canvey Island",
+            "Coggeshall Town", "Felixstowe & Walton United", "Great Wakering Rovers", "Grays Athletic", "Heybridge Swifts", "Maldon & Tiptree",
+            "Romford", "Tilbury", "Walthamstow", "Witham Town", "Woodham Athletic",
+            "Woodham Town",
+            "Arsenal"
+        ];
+
+        let userId = null;
+        const enteredTeams = new Set(); // Keep track of teams with an entered company name
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const teamsTableBody = document.getElementById('teamsTableBody');
+            const drawButton = document.getElementById('drawButton');
+            const countdownDisplay = document.getElementById('countdownDisplay');
+            const winnerDisplay = document.getElementById('winnerDisplay');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const sponsoredTeamsCount = document.getElementById('sponsored-teams-count');
+            const drawError = document.getElementById('drawError');
+            const authErrorBanner = document.getElementById('authErrorBanner');
+
+            // Dynamically create table rows for each team initially
+            teams.forEach(team => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50 transition duration-150 fade-in';
+                tr.setAttribute('data-team-name', team);
+                tr.innerHTML = `
+                    <td class="px-4 py-4 whitespace-nowrap">
+                        <div class="font-medium text-gray-900">${team}</div>
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap">
+                        <input type="text" name="${team.toLowerCase().replace(/\s/g, '-')}-sponsor" placeholder="Company Name" class="input-text mt-2 block w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
+                    </td>
+                `;
+                teamsTableBody.appendChild(tr);
+            });
+
+            // Path has been simplified to 'teams' to match the new security rules
+            const teamsCollectionPath = 'teams';
+            let unsubscribe = null; // Declare unsubscribe here to make it accessible
+
+            // Explicitly sign in first to ensure authentication is ready
+            try {
+                // Use anonymous sign-in for public forms on static sites
+                await auth.signInAnonymously();
+                console.log("Successfully authenticated anonymously.");
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                loadingIndicator.classList.add('hidden');
+                authErrorBanner.textContent = "Authentication Error: The Firebase configuration is incorrect or incomplete, or the 'Anonymous' sign-in method is not enabled. Please check your Firebase project settings and enable 'Anonymous' sign-in under the 'Authentication' section.";
+                authErrorBanner.classList.remove('hidden');
+                return; // Stop execution if auth fails
+            }
+
+            // Now that we are authenticated, set up the real-time listener
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    userId = user.uid;
+                    console.log("Auth state changed. User ID:", userId);
+
+                    // Set up the real-time listener for team data
+                    console.log("Attempting to listen to Firestore data.");
+                    unsubscribe = db.collection(teamsCollectionPath).onSnapshot((snapshot) => {
+                        enteredTeams.clear(); // Clear the set before re-populating
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            const teamName = data.teamName;
+                            const companyName = data.companyName;
+
+                            const inputField = document.querySelector(`tr[data-team-name="${teamName}"] input`);
+                            if (inputField) {
+                                inputField.value = companyName;
+                                inputField.disabled = true;
+                                enteredTeams.add(teamName);
+                            }
+                        });
+
+                        // Update the sponsored teams count
+                        sponsoredTeamsCount.textContent = `${enteredTeams.size}/${teams.length} teams sponsored`;
+
+                        // Check if all 40 teams have been entered to enable the draw button
+                        if (enteredTeams.size === teams.length) {
+                            drawButton.disabled = false;
+                            drawError.textContent = '';
+                        } else {
+                            drawButton.disabled = true;
+                        }
+
+                        loadingIndicator.classList.add('hidden');
+                        console.log("Team data loaded from Firestore.");
+                    }, (error) => {
+                        console.error("Error fetching data from Firestore:", error);
+                        loadingIndicator.classList.add('hidden');
+                    });
+                }
+            });
+
+            // Handle input change to save to Firestore
+            teamsTableBody.addEventListener('change', async (e) => {
+                const input = e.target;
+                if (input.tagName === 'INPUT' && input.value.trim() !== '' && userId) {
+                    const teamName = input.closest('tr').getAttribute('data-team-name');
+                    const companyName = input.value.trim();
+                    
+                    // Construct a document reference using the team name as the document ID
+                    const docRef = db.collection(teamsCollectionPath).doc(teamName);
+                    
+                    try {
+                        await docRef.set({
+                            teamName: teamName,
+                            companyName: companyName,
+                            userId: userId
+                        });
+                        console.log(`Company name for ${teamName} saved to Firestore.`);
+                        input.disabled = true; // Disable after successful save
+                        enteredTeams.add(teamName);
+                        // The onSnapshot listener will handle updating the count and button state
+                    } catch (error) {
+                        console.error("Error saving document to Firestore:", error);
+                    }
+                }
+            });
+
+            // Handle the draw button click
+            drawButton.addEventListener('click', async () => {
+                // Before starting, check if all 40 teams are sponsored
+                if (enteredTeams.size !== teams.length) {
+                    drawError.textContent = "Error: All 40 teams must be sponsored before the draw can be run.";
+                    return;
+                }
+
+                let countdown = 10;
+                drawButton.disabled = true;
+                winnerDisplay.textContent = '';
+                countdownDisplay.textContent = `Picking a winner in ${countdown}...`;
+
+                // Fetch the latest list of teams with company names from the database
+                const querySnapshot = await db.collection(teamsCollectionPath).get();
+                const teamsWithCompanies = querySnapshot.docs.map(doc => doc.data().teamName);
+                
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (countdown > 0) {
+                        countdownDisplay.textContent = `Picking a winner in ${countdown}...`;
+                    } else {
+                        clearInterval(countdownInterval);
+                        countdownDisplay.textContent = '';
+                        
+                        // Select a random team from the list of teams that have a company name
+                        const randomIndex = Math.floor(Math.random() * teamsWithCompanies.length);
+                        const winningTeam = teamsWithCompanies[randomIndex];
+                        
+                        // Display the winning team
+                        winnerDisplay.textContent = `The winning team is... ${winningTeam}!`;
+                        drawButton.disabled = false;
+                    }
+                }, 1000);
+            });
+
+            // Clean up the Firestore listener when the page is unloaded
+            window.addEventListener('beforeunload', () => {
+                if (unsubscribe) {
+                    unsubscribe();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
